@@ -52,7 +52,35 @@ def userFromBook(bookID):
     return uID, bookTitle
 
 
-# In[4]:
+def populate_friends(ratingsCollection, friendsCollection, booksCollection, sleepTime):
+    ratingsRecords = ratingsCollection.find()
+
+    for record in ratingsRecords:
+        userID = record['userID']
+        if friendsCollection.find({'userID': {'$eq': userID}}).count() == 0:
+            # don't have friends for this user, scrape them
+            friendIDs = getFriends(sleepTime, userID)
+            friendsToMongo(friendsCollection, userID, friendIDs)
+            friendCount = len(friendIDs)
+
+            # count how many friends exist in the ratings db
+            friendsExplored = []
+            for friendID in friendIDs:
+                if ratingsCollection.find({'userID': {'$eq': friendID}}).count() > 0:
+                    friendsExplored.append(friendID)
+            exploredCount = len(friendsExplored)
+
+            friendsCollection.update_one(
+                {"userID": userID},
+                {"$set":
+                {"friendsExplored": friendsExplored}
+                },
+                upsert=True)
+
+            print 'User %d has %d friends explored, or %f%% of their friends.' % (userID,
+                                                                                  exploredCount,
+                                                                                  100*float(exploredCount)/
+                                                                                  friendCount)
 
 # In[5]:
 
