@@ -150,11 +150,12 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                         testUserID, bookTitle = userFromBook(testBookID)
                     print 'Linking via book %d (%s).\n' % (testBookID, bookTitle)
                 else:
-                    if friendsCollection.find({"userID": testUserID}).count() == 0:
-                        # don't have this user's friends, scrape them
+                    if friendsCollection.find({"userID": userID}).count() == 0:
+                        # don't have the pre-step user's friends, scrape them
                         friendIDs = getFriends(sleepTime, userID)
+                        friendsToMongo(friendsCollection, userID, friendIDs)
                     else:
-                        friendIDs = friendsCollection.find_one({"userID": testUserID})['friends']
+                        friendIDs = friendsCollection.find_one({"userID": userID})['friends']
                     testUserID = choice(friendIDs)
                     print 'Linking via friendship with user %d.\n' % testUserID
 
@@ -187,5 +188,8 @@ if __name__ == '__main__':
     friends = db['friends']
     ratings = db['reviews']
     books = db['books']
+
+    # DEBUG/TESTING ONLY -- deletes everything we have !!
+    reset_colls(friends, ratings, books)
 
     exploreFromRecentMultigraph(ratings, friends, books, 0.05)

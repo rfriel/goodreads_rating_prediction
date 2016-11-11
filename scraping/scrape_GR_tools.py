@@ -50,7 +50,6 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
         friendCount = soup.select_one('.smallText').get_text()
     except AttributeError:
         return None
-    friendIDs = []
 
     numFriends = int(str(friendCount[friendCount.rfind(' ') +  1 : friendCount.rfind(')')]).translate(None, ','))
     if friendCountOnly:
@@ -58,27 +57,32 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
 
     time.sleep(sleepTime)
 
-    if numFriends > 0:
-        url = 'https://www.goodreads.com/friend/user/' + str(curUserID) \
-            + '?page=1&sort=first_name&per_page=' + str(numFriends)
+    friendIDs = []
 
-        #browser.get(url)
-        waitTimeCount = 0
-        friendTable = None
-        while friendTable == None:
+    if numFriends > 0:
+        perPage = min(numFriends, 600)
+        curPage = 1
+
+        while len(friendIDs) < numFriends:
+            url = 'https://www.goodreads.com/friend/user/' + str(curUserID) \
+                + '?page=' + str(curPage) + '&sort=first_name&per_page=' + str(perPage)
+
             soup = BeautifulSoup(requests.get(url,cookies=cookies()).content, 'lxml')
             friendTable = soup.find(id='friendTable')
-            if waitTimeCount > 0:
-                print 'Server is slow, waiting %f seconds . . . ' % float(waitTimeCount*sleepTime)
-                time.sleep(waitTimeCount*sleepTime)
-            waitTimeCount += 1
-
-        friendHrefs = [link.get('href') for link in friendTable.findAll('a')]
-
-        friendHrefs = filter(lambda s: s is not None, friendHrefs)
-
-        friendComps = filter(lambda s: s[:14]=='/user/compare/', friendHrefs)
-        friendIDs.extend([int(s[14:]) for s in friendComps])
+            if friendTable is not None:
+                friendHrefs = [link.get('href') for link in friendTable.findAll('a')]
+                friendHrefs = filter(lambda s: s is not None, friendHrefs)
+                friendComps = filter(lambda s: s[:14]=='/user/compare/', friendHrefs)
+                friendIDs.extend([int(s[14:]) for s in friendComps])
+                curPage += 1
+                time.sleep(sleepTime)
+            else:
+                print 'Server choked on large page, halfing friends per page to . . . ' % round(perPage/2.)
+                perPage = round(perPage/2)
+                numPages *= 2
+                curPage = 1
+                friendIDs = []
+                time.sleep(sleepTime)
 
     time.sleep(sleepTime)
 
@@ -94,6 +98,7 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
 
 
 def getReviews(sleepTime, curUserID):
+    # this really ought to be called "getRatings"
     startTime = timeit.default_timer()
     ratingDict = {}
 
@@ -117,7 +122,7 @@ def getReviews(sleepTime, curUserID):
     else:
         username = headerLinks[1].text
 
-    print 'Scraping user %d (%s)... ' % (curUserID, username)
+    print 'Scraping %d ratings from user %d (%s)... ' % (numBooksOnCurShelf, curUserID, username)
     time.sleep(sleepTime)
 
     starsStrainer = SoupStrainer()
@@ -170,13 +175,14 @@ def friendsToMongo(friendsCollection, userID, friendIDs):
         upsert=True)
 
     # add curUserID to f-list of each of their friends
-
+    # turning this off, it makes a lot of things confusing
+    '''
     for friend in friendIDs:
         friendsCollection.update_one(
         {"userID": friend},
         {"$addToSet": {"friends": userID}},
         upsert=True)
-
+    '''
 
 
 def snowballSample(startID, depth, sleepTime):
@@ -231,3 +237,8 @@ def make_adj_dict(curUserID, friends, depth=2, friendOfFriendThreshold=0):
                     print len(adj_dict)
         if i < depth:
             searchIDs = nextLevelSearchIDs.copy()
+
+def reset_colls(friendsCollection, ratingsCollection, booksCollection):
+    friendsCollection.delete_many({})
+    ratingsCollection.delete_many({})
+    booksCollection.delete_many({})
