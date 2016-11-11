@@ -119,6 +119,45 @@ def exploreFromRecent(ratingsCollection, friendsCollection, booksCollection, sle
         testRatingDict = {}
 
 
+def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksCollection, sleepTime, scrapeLimit=-1):
+    usersScraped = 0
+    ratingDict = {}
+    testRatingDict = {}
+
+    while usersScraped < scrapeLimit or scrapeLimit < 0:
+        if usersScraped == 0:
+            testUserID = userFromRecentReviews()
+        else:
+            ratingDegree = len(ratingDict)
+            friendDegree = getFriends(sleepTime, userID, friendCountOnly=True)
+            chooseRatingGraph = (np.randint(ratingDegree + friendDegree) + 1) <= ratingDegree
+            if chooseRatingGraph:
+                try:
+                    testBookID = choice(ratingDict.keys())
+                except IndexError:
+                    pdb.set_trace()
+                testUserID = None
+                while testUserID == None:
+                    testUserID, bookTitle = userFromBook(testBookID)
+                print 'Linking via book %d (%s).' % (testBookID, bookTitle)
+            else:
+                if friendsCollection.find({"userID": testUserID}).count() == 0:
+
+        if ratingsCollection.find({"userID": testUserID}).count() == 0:
+            # don't have this user's ratings, scrape them
+            usersScraped += 1
+            testRatingDict = getReviews(sleepTime, testUserID)
+            ratingsToMongo(ratingsCollection, testUserID, testRatingDict)
+            booksToMongo(booksCollection, testUserID, testRatingDict)
+
+        '''
+        # got a populated ratingDict, record it and the user
+        ratingDict = testRatingDict
+        userID = testUserID
+        # reset testRatingDict to search for a new one
+        testRatingDict = {}
+        '''
+
 # In[6]:
 
 if __name__ == '__main__':
