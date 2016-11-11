@@ -30,7 +30,7 @@ def cookies():
     #
     # provide the content of these cookies in cookies.txt, with the content of
     # 'u' in the first row and the content of 'p' in the second.
-    
+
     with open('cookies.txt') as f:
         for line in f:
             valueList.append(line.strip())
@@ -40,7 +40,7 @@ def cookies():
           'p': 'K40nHvKlIuz-1knEFEfM755lu5S2kCE0YpLNQsjr6-SdEfm1'}
     '''
 
-def getFriends(sleepTime, curUserID):
+def getFriends(sleepTime, curUserID, friendCountOnly=False):
     startTime = timeit.default_timer()
     url = 'https://www.goodreads.com/friend/user/' + str(curUserID)
     #browser.get(url)
@@ -49,15 +49,15 @@ def getFriends(sleepTime, curUserID):
     try:
         friendCount = soup.select_one('.smallText').get_text()
     except AttributeError:
-        return []
+        return None
     friendIDs = []
 
     numFriends = int(str(friendCount[friendCount.rfind(' ') +  1 : friendCount.rfind(')')]).translate(None, ','))
-    #numPages = numFriends/30 + 1
+    if friendCountOnly:
+        return numFriends
 
     time.sleep(sleepTime)
 
-    #for i in range(1,numPages+1):
     if numFriends > 0:
         url = 'https://www.goodreads.com/friend/user/' + str(curUserID) \
             + '?page=1&sort=first_name&per_page=' + str(numFriends)
@@ -107,7 +107,7 @@ def getReviews(sleepTime, curUserID):
     try:
         curShelfString = soup.select_one('.h1Shelf').select_one('span').get_text()
     except AttributeError:
-        return {}
+        return None
     numBooksOnCurShelf = int(str(curShelfString[curShelfString.rfind('(')+  1 : curShelfString.rfind(')')]).translate(None, ','))
     numPages = numBooksOnCurShelf/200 + 1
 
