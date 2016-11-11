@@ -97,12 +97,12 @@ def exploreFromRecent(ratingsCollection, friendsCollection, booksCollection, sle
             if usersScraped == 0:
                 testUserID = userFromRecentReviews()
             else:
-                try:
-                    testBookID = choice(ratingDict.keys())
-                except IndexError:
-                    pdb.set_trace()
                 testUserID = None
                 while testUserID == None:
+                    try:
+                        testBookID = choice(ratingDict.keys())
+                    except IndexError:
+                        pdb.set_trace()
                     testUserID, bookTitle = userFromBook(testBookID)
             if ratingsCollection.find({"userID": testUserID}).count() == 0:
                 # don't have this user's ratings, scrape them
@@ -130,33 +130,44 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
         else:
             ratingDegree = len(ratingDict)
             friendDegree = getFriends(sleepTime, userID, friendCountOnly=True)
-            chooseRatingGraph = (np.randint(ratingDegree + friendDegree) + 1) <= ratingDegree
+            try:
+                randDraw = np.random.randint(ratingDegree + friendDegree) + 1
+                chooseRatingGraph = randDraw <= ratingDegree
+                print '\nratingDegree %d, friendDegree %d, random draw %d, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
+            except ValueError:
+                print 'Could not select a graph randomly (user had ratingDegree %d and friendDegree %d).  Starting over...' % (ratingDegree, friendDegree)
+                exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksCollection, sleepTime, scrapeLimit)
+                return None
             if chooseRatingGraph:
-                try:
-                    testBookID = choice(ratingDict.keys())
-                except IndexError:
-                    pdb.set_trace()
                 testUserID = None
                 while testUserID == None:
+                    try:
+                        testBookID = choice(ratingDict.keys())
+                    except IndexError:
+                        pdb.set_trace()
                     testUserID, bookTitle = userFromBook(testBookID)
-                print 'Linking via book %d (%s).' % (testBookID, bookTitle)
+                print 'Linking via book %d (%s).\n' % (testBookID, bookTitle)
             else:
                 if friendsCollection.find({"userID": testUserID}).count() == 0:
+                    # don't have this user's friends, scrape them
+                    friendIDs = getFriends(sleepTime, userID)
+                else:
+                    friendIDs = friendsCollection.find_one({"userID": testUserID})['friends']
+                testUserID = choice(friendIDs)
+                print 'Linking via friendship with user %d.\n' % testUserID
 
         if ratingsCollection.find({"userID": testUserID}).count() == 0:
             # don't have this user's ratings, scrape them
-            usersScraped += 1
             testRatingDict = getReviews(sleepTime, testUserID)
             ratingsToMongo(ratingsCollection, testUserID, testRatingDict)
             booksToMongo(booksCollection, testUserID, testRatingDict)
 
-        '''
-        # got a populated ratingDict, record it and the user
+        # successfully moved to new user testUserID, and scraped if necessary
+        # now set things up for the next loop
+        usersScraped += 1
+
         ratingDict = testRatingDict
         userID = testUserID
-        # reset testRatingDict to search for a new one
-        testRatingDict = {}
-        '''
 
 # In[6]:
 
@@ -165,10 +176,10 @@ if __name__ == '__main__':
 
     client = MongoClient('mongodb://localhost:27017/')
 
-    db = client['goodreads_explore']
+    db = client['goodreads_explore_multigraph']
 
     friends = db['friends']
     ratings = db['reviews']
     books = db['books']
 
-    exploreFromRecent(ratings, friends, books, 0.05)
+    exploreFromRecentMultigraph(ratings, friends, books, 0.05)
