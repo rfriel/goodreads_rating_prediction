@@ -29,7 +29,10 @@ def userFromBook(bookID):
     soup = BeautifulSoup(requests.get(urlBook,cookies=cookies()).content, 'lxml')
 
     bookTitle = soup.select('.bookTitle')[0].text.strip()
-    nRatings = int(soup.find_all(itemprop="ratingCount")[0].get('title'))
+    try:
+        nRatings = int(soup.find_all(itemprop="ratingCount")[0].get('title'))
+    except IndexError:
+        return None, None
 
     if nRatings < 1:
         return None, None
