@@ -127,18 +127,19 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
 
     while usersScraped < scrapeLimit or scrapeLimit < 0:
         successfulStep = False
+        atLeastOneRating = True # we know the first user rated a book because we got them from the recent reviews page
         while not successfulStep:
             if usersScraped == 0:
                 testUserID = userFromRecentReviews()
             else:
                 ratingDegree = len(ratingDict)
-                friendDegree = getFriends(sleepTime, userID, friendCountOnly=True)
+                friendDegree = getFriends(sleepTime, userID, friendCountOnly=True) # record this in the db!!
                 try:
                     randDraw = np.random.randint(ratingDegree + friendDegree) + 1
                     chooseRatingGraph = randDraw <= ratingDegree
                     print '\nratingDegree %d, friendDegree %d, random draw %d, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
                 except ValueError:
-                    print 'Got ratingDegree %d, friendDegree %d, cannot step here.  Entering debugger...' % (ratingDegree, friendDegree)
+                    print 'Got ratingDegree %d, friendDegree %d, should not have stepped here.  Entering debugger...' % (ratingDegree, friendDegree)
                     pdb.set_trace()
                 if chooseRatingGraph:
                     testUserID = None
@@ -148,6 +149,7 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                         except IndexError:
                             pdb.set_trace()
                         testUserID, bookTitle = userFromBook(testBookID)
+                    atLeastOneRating = True # we got to this user via a rating of theirs so they have at least one
                     print 'Linking via book %d (%s).\n' % (testBookID, bookTitle)
                 else:
                     if friendsCollection.find({"userID": userID}).count() == 0:
@@ -157,11 +159,12 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                     else:
                         friendIDs = friendsCollection.find_one({"userID": userID})['friends']
                     testUserID = choice(friendIDs)
+                    atLeastOneRating = False
                     print 'Linking via friendship with user %d.\n' % testUserID
 
             if ratingsCollection.find({"userID": testUserID}).count() == 0:
                 # don't have this user's ratings, scrape them
-                testRatingDict = getReviews(sleepTime, testUserID)
+                testRatingDict = getReviews(sleepTime, testUserID, atLeastOneRating)
                 if testRatingDict is not None:
                     ratingsToMongo(ratingsCollection, testUserID, testRatingDict)
                     booksToMongo(booksCollection, testUserID, testRatingDict)

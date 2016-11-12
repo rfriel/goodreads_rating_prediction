@@ -1,5 +1,5 @@
-from selenium import webdriver
-from selenium.webdriver.support.ui import Select
+#from selenium import webdriver
+#from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup, SoupStrainer
 
 import time
@@ -97,23 +97,31 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
 
 
 
-def getReviews(sleepTime, curUserID):
+def getReviews(sleepTime, curUserID, atLeastOneRating=False):
     # this really ought to be called "getRatings"
     startTime = timeit.default_timer()
     ratingDict = {}
 
     url = 'https://www.goodreads.com/review/list/' + str(curUserID) + '?page=' + str(1) + '&print=true&shelf=read&per_page=200'
-    #browser.get(url)
 
-    #soup = BeautifulSoup(browser.page_source, 'lxml')
-    reqOut = requests.get(url,cookies=cookies())
-    soup = BeautifulSoup(reqOut.content, 'lxml')
+    soup = BeautifulSoup(requests.get(url,cookies=cookies()).content, 'lxml')
 
     try:
         curShelfString = soup.select_one('.h1Shelf').select_one('span').get_text()
     except AttributeError:
         return None
     numBooksOnCurShelf = int(str(curShelfString[curShelfString.rfind('(')+  1 : curShelfString.rfind(')')]).translate(None, ','))
+
+    scrapeAllShelves = False
+    if numBooksOnCurShelf == 0 and atLeastOneRating == True:
+        # this user has rated books, but has no books on 'read' shelf, so scrape all shelves
+        scrapeAllShelves = True
+        url = 'https://www.goodreads.com/review/list/' + str(curUserID) + '?page=' + str(1) + '&per_page=200'
+        reqOut = requests.get(url,cookies=cookies())
+        soup = BeautifulSoup(reqOut.content, 'lxml')
+        curShelfString = soup.select_one('.selectedShelf').get_text()
+        numBooksOnCurShelf = int(str(curShelfString[curShelfString.rfind('(')+  1 : curShelfString.rfind(')')]).translate(None, ','))
+
     numPages = numBooksOnCurShelf/200 + 1
 
     headerLinks = soup.find(id='header').find_all('a')
@@ -129,9 +137,12 @@ def getReviews(sleepTime, curUserID):
 
 
     for i in range(1, numPages+1):
-        url = 'https://www.goodreads.com/review/list/' + str(curUserID) + '?page=' + str(i) + '&print=true&shelf=read&per_page=200'
+        if scrapeAllShelves:
+            url = 'https://www.goodreads.com/review/list/' + str(curUserID) + '?page=' + str(i) + '&print=true&per_page=200'
+        else:
+            url = 'https://www.goodreads.com/review/list/' + str(curUserID) + '?page=' + str(i) + '&print=true&shelf=read&per_page=200'
         #browser.get(url)
-        if i > 1:
+        if i > 1 or scrapeAllShelves:
             reqOut = requests.get(url,cookies=cookies())
             soup = BeautifulSoup(reqOut.content, 'lxml')
         #soup = BeautifulSoup(browser.page_source, 'lxml')
