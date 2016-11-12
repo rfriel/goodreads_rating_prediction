@@ -135,9 +135,11 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                 ratingDegree = len(ratingDict)
                 friendDegree = getFriends(sleepTime, userID, friendCountOnly=True) # record this in the db!!
                 try:
-                    randDraw = np.random.randint(ratingDegree + friendDegree) + 1
-                    chooseRatingGraph = randDraw <= ratingDegree
-                    print '\nratingDegree %d, friendDegree %d, random draw %d, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
+                    #randDraw = np.random.randint(ratingDegree + friendDegree) + 1
+                    #chooseRatingGraph = randDraw <= ratingDegree
+                    randDraw = np.random.rand()
+                    chooseRatingGraph = ((randDraw <= 0.5) and (ratingDegree != 0)) or (friendDegree == 0)
+                    print '\nratingDegree %d, friendDegree %d, random draw %f, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
                 except ValueError:
                     print 'Got ratingDegree %d, friendDegree %d, should not have stepped here.  Entering debugger...' % (ratingDegree, friendDegree)
                     pdb.set_trace()
@@ -186,7 +188,7 @@ if __name__ == '__main__':
 
     client = MongoClient('mongodb://localhost:27017/')
 
-    db = client['goodreads_explore_multigraph']
+    db = client['goodreads_explore_multigraph_biased_sampling']
 
     friends = db['friends']
     ratings = db['reviews']
