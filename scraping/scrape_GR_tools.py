@@ -99,6 +99,7 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
 
 def getReviews(sleepTime, curUserID, atLeastOneRating=False):
     # this really ought to be called "getRatings"
+    # TO DO ASAP: SAVE RATING DATES!!!!
     startTime = timeit.default_timer()
     ratingDict = {}
 
@@ -148,11 +149,17 @@ def getReviews(sleepTime, curUserID, atLeastOneRating=False):
         #soup = BeautifulSoup(browser.page_source, 'lxml')
         stars = soup.select('.staticStars')
         myRatingStars = soup.select('.stars')
+        dateReadField = soup.select('.field.date_read')
+        dateAddedField = soup.select('.field.date_added')
 
-        for userRating, myRating in zip(stars, myRatingStars):
+        for userRating, myRating, dateRead, dateAdded in zip(stars, myRatingStars,
+                                                             dateReadField[1:], dateAddedField[1:]):
             bookID = (int(myRating['data-resource-id']))
             bookRating = (len(userRating.select('.staticStar.p10')))
-            ratingDict[bookID] = bookRating
+            bookDateRead = dateRead.find(class_='value').text.strip()
+            bookDateAdded = dateAdded.find(class_='value').text.strip()
+
+            ratingDict[bookID] = [bookRating, bookDateRead, bookDateAdded]
         time.sleep(sleepTime)
 
     if len(ratingDict) != numBooksOnCurShelf:
