@@ -4,6 +4,7 @@
 # In[1]:
 
 from scrape_GR_tools import *
+from collections import Counter
 
 # In[2]:
 
@@ -64,28 +65,54 @@ def populate_friends(ratingsCollection, friendsCollection, booksCollection, slee
             # don't have friends for this user, scrape them
             friendIDs = getFriends(sleepTime, userID)
             friendsToMongo(friendsCollection, userID, friendIDs)
+        else:
+            friendIDs = friendsCollection.find_one({'userID': {'$eq': userID}})['friends']
             friendCount = len(friendIDs)
 
-            # count how many friends exist in the ratings db
-            friendsExplored = []
-            for friendID in friendIDs:
-                if ratingsCollection.find({'userID': {'$eq': friendID}}).count() > 0:
-                    friendsExplored.append(friendID)
-            exploredCount = len(friendsExplored)
+        # count how many friends exist in the ratings db
+        friendsExplored = []
+        for friendID in friendIDs:
+            if ratingsCollection.find({'userID': {'$eq': friendID}}).count() > 0:
+                friendsExplored.append(friendID)
+        exploredCount = len(friendsExplored)
 
-            friendsCollection.update_one(
-                {"userID": userID},
-                {"$set":
-                {"friendsExplored": friendsExplored}
-                },
-                upsert=True)
+        friendsCollection.update_one(
+            {"userID": userID},
+            {"$set":
+            {"friendsExplored": friendsExplored}
+            },
+            upsert=True)
 
-            print 'User %d has %d friends explored, or %f%% of their friends.' % (userID,
-                                                                                  exploredCount,
-                                                                                  100*float(exploredCount)/
-                                                                                  friendCount)
+        print 'User %d has %d friends explored, or %f%% of their friends.' % (userID,
+                                                                              exploredCount,
+                                                                              100*float(exploredCount)/
+
+                                                              friendCount)
 
 # In[5]:
+
+def computeFriendRatingFractions(ratingsCollection, friendsCollection, booksCollection, sleepTime):
+    ratingsRecords = ratingsCollection.find()
+
+    allUserFractions = {}
+
+    for record in ratingsRecords:
+        userID = record['userID']
+        ratingDict = record['ratings'] # keys are bookIDs
+        userFractions = []
+        for bookID in ratingDict.keys():
+            allRatingsForBook = booksCollection.find_one({'bookID': {'$eq': int(bookID)}})['ratings'] # dict, keys are userIDs
+            if len(allRatingsForBook) > 1:
+                allRatersForBook = set([int(uID) for uID in allRatingsForBook.keys()])
+                userFriendIDs = set(friendsCollection.find_one({'userID': {'$eq': userID}})['friends'])
+                friendRaters = allRatersForBook.intersection(userFriendIDs)
+                fractionOfRatersWhoAreFriends  = float(len(friendRaters)) / len(allRatersForBook)
+                userFractions.append(fractionOfRatersWhoAreFriends)
+        allUserFractions[userID] = userFractions
+        #if len(userFractions) > 0:
+        #    print 'Mean fraction for user %d is %f' % (userID, float(sum(userFractions))/len(userFractions))
+    return allUserFractions
+
 
 def exploreFromRecent(ratingsCollection, friendsCollection, booksCollection, sleepTime, scrapeLimit=-1):
     usersScraped = 0
@@ -138,7 +165,8 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                     #randDraw = np.random.randint(ratingDegree + friendDegree) + 1
                     #chooseRatingGraph = randDraw <= ratingDegree
                     randDraw = np.random.rand()
-                    chooseRatingGraph = ((randDraw <= 0.5) and (ratingDegree != 0)) or (friendDegree == 0)
+                    #chooseRatingGraph = ((randDraw <= 0.5) and (ratingDegree != 0)) or (friendDegree == 0)
+                    chooseRatingGraph = (friendDegree == 0)
                     print '\nratingDegree %d, friendDegree %d, random draw %f, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
                 except ValueError:
                     print 'Got ratingDegree %d, friendDegree %d, should not have stepped here.  Entering debugger...' % (ratingDegree, friendDegree)
