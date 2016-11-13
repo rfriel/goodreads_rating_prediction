@@ -77,7 +77,7 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
                 curPage += 1
                 time.sleep(sleepTime)
             else:
-                print 'Server choked on large page, halfing friends per page to %f . . . ' % int(perPage/2.)
+                print 'Server choked on large page, halfing friends per page to %d . . . ' % int(perPage/2.)
                 perPage = int(perPage/2)
                 numPages *= 2
                 curPage = 1
