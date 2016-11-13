@@ -195,6 +195,6 @@ if __name__ == '__main__':
     books = db['books']
 
     # DEBUG/TESTING ONLY -- deletes everything we have !!
-    reset_colls(friends, ratings, books)
+    # reset_colls(friends, ratings, books)
 
     exploreFromRecentMultigraph(ratings, friends, books, 0.05)
