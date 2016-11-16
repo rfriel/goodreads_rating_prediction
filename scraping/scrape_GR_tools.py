@@ -13,8 +13,8 @@ import cProfile
 import pstats
 import pdb
 
-import networkx as nx
-import nxpd as nxpd
+#import networkx as nx
+#import nxpd as nxpd
 
 import numpy as np
 from random import choice
