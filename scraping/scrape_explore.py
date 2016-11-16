@@ -4,6 +4,7 @@
 # In[1]:
 
 from scrape_GR_tools import *
+from collections import Counter
 
 # In[2]:
 
@@ -64,28 +65,66 @@ def populate_friends(ratingsCollection, friendsCollection, booksCollection, slee
             # don't have friends for this user, scrape them
             friendIDs = getFriends(sleepTime, userID)
             friendsToMongo(friendsCollection, userID, friendIDs)
-            friendCount = len(friendIDs)
+        else:
+            friendIDs = friendsCollection.find_one({'userID': {'$eq': userID}})['friends']
+        friendCount = len(friendIDs)
 
-            # count how many friends exist in the ratings db
-            friendsExplored = []
-            for friendID in friendIDs:
-                if ratingsCollection.find({'userID': {'$eq': friendID}}).count() > 0:
-                    friendsExplored.append(friendID)
-            exploredCount = len(friendsExplored)
+        # count how many friends exist in the ratings db
+        friendsExplored = []
+        for friendID in friendIDs:
+            if ratingsCollection.find({'userID': {'$eq': friendID}}).count() > 0:
+                friendsExplored.append(friendID)
+        exploredCount = len(friendsExplored)
 
-            friendsCollection.update_one(
-                {"userID": userID},
-                {"$set":
-                {"friendsExplored": friendsExplored}
-                },
-                upsert=True)
+        friendsCollection.update_one(
+            {"userID": userID},
+            {"$set":
+            {"friendsExplored": friendsExplored}
+            },
+            upsert=True)
 
-            print 'User %d has %d friends explored, or %f%% of their friends.' % (userID,
-                                                                                  exploredCount,
-                                                                                  100*float(exploredCount)/
-                                                                                  friendCount)
+        print 'User %d has %d friends explored, or %f%% of their friends.' % (userID,
+                                                                              exploredCount,
+                                                                              100*float(exploredCount)/
+                                                              max(1, friendCount))
 
 # In[5]:
+
+def computeFriendRatingFractions(ratingsCollection, friendsCollection, booksCollection, sleepTime, sampleRate=1, limit=-1):
+    ratingsRecords = ratingsCollection.find(no_cursor_timeout=True)
+    startTime = timeit.default_timer()
+    sampleSize = 0
+    allUserFractions = {}
+
+    for record in ratingsRecords:
+        userID = record['userID']
+        ratingDict = record['ratings'] # keys are bookIDs
+        userFractions = []
+        for bookID in ratingDict.keys():
+            randDraw = np.random.rand()
+            if randDraw < sampleRate:
+                allRatingsForBook = booksCollection.find_one({'bookID': {'$eq': int(bookID)}})['ratings'] # dict, keys are userIDs
+                if len(allRatingsForBook) > 1:
+                    allRatersForBook = set([int(uID) for uID in allRatingsForBook.keys()])
+                    userFriendIDs = set(friendsCollection.find_one({'userID': {'$eq': userID}})['friends'])
+                    friendRaters = allRatersForBook.intersection(userFriendIDs)
+                    fractionOfRatersWhoAreFriends  = float(len(friendRaters)) / len(allRatersForBook)
+                    userFractions.append(fractionOfRatersWhoAreFriends)
+        allUserFractions[userID] = userFractions
+        sampleSize += len(userFractions)
+        if len(allUserFractions) % 10 == 1:
+            print len(allUserFractions)
+            endTime = timeit.default_timer()
+            print 'Time: %f s' % (endTime - startTime)
+            print '%d, or %f%%' % (sampleSize, float(sampleSize)/limit)
+            startTime = timeit.default_timer()
+        if sampleSize > limit and limit > 0:
+            break
+        #if len(userFractions) > 0:
+        #    print 'Mean fraction for user %d is %f' % (userID, float(sum(userFractions))/len(userFractions))
+    ratingsRecords.close()
+    return allUserFractions
+
 
 def exploreFromRecent(ratingsCollection, friendsCollection, booksCollection, sleepTime, scrapeLimit=-1):
     usersScraped = 0
@@ -135,9 +174,12 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
                 ratingDegree = len(ratingDict)
                 friendDegree = getFriends(sleepTime, userID, friendCountOnly=True) # record this in the db!!
                 try:
-                    randDraw = np.random.randint(ratingDegree + friendDegree) + 1
-                    chooseRatingGraph = randDraw <= ratingDegree
-                    print '\nratingDegree %d, friendDegree %d, random draw %d, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
+                    #randDraw = np.random.randint(ratingDegree + friendDegree) + 1
+                    #chooseRatingGraph = randDraw <= ratingDegree
+                    randDraw = np.random.rand()
+                    chooseRatingGraph = ((randDraw <= 0.5) and (ratingDegree != 0)) or (friendDegree == 0)
+                    #chooseRatingGraph = (friendDegree == 0)
+                    print '\nratingDegree %d, friendDegree %d, random draw %f, chooseRatingGraph: %d' % (ratingDegree, friendDegree, randDraw, int(chooseRatingGraph))
                 except ValueError:
                     print 'Got ratingDegree %d, friendDegree %d, should not have stepped here.  Entering debugger...' % (ratingDegree, friendDegree)
                     pdb.set_trace()
@@ -179,6 +221,68 @@ def exploreFromRecentMultigraph(ratingsCollection, friendsCollection, booksColle
         ratingDict = testRatingDict
         userID = testUserID
 
+def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollection, sleepTime, scrapeLimit=-1, scrapeFriends=False):
+    urlBook = 'https://www.goodreads.com/book/show/' + str(bookID)
+    soup = BeautifulSoup(requests.get(urlBook,cookies=cookies()).content, 'lxml')
+
+    bookTitle = soup.select('.bookTitle')[0].text.strip()
+    try:
+        nRatings = int(soup.find_all(itemprop="ratingCount")[0].get('title'))
+    except IndexError:
+        print 'Could not find number of ratings.'
+        return None
+
+    if nRatings < 1:
+        print 'Found zero ratings.'
+        return None
+
+    nPages = nRatings/30 + 1
+    allUIDs = set()
+
+    if booksCollection.find({'bookID': bookID, 'allUIDs': {'$exists': True}}).count() == 0:
+        # don't have a list of all users who rated this book, scrape it
+        for page in range(1, nPages+1):
+            print 'Scraping book\'s raters (page %d of %d)...' % (page, nPages)
+            urlBookPage = 'https://www.goodreads.com/book/delayable_book_show/'     + str(bookID) + '?page=' + str(page)
+
+            soup = BeautifulSoup(requests.get(urlBookPage,cookies=cookies()).content, 'lxml')
+
+            users = soup.select('.user')
+            hrefs = [users[index].get('href') for index in range(len(users))]
+            uIDs = [int(href[11:href.find('-')]) for href in hrefs]
+            allUIDs.update(uIDs)
+        booksCollection.update_one(
+            {"bookID": bookID},
+            {"$set": {"allUIDs": list(allUIDs)}},
+            upsert=True)
+
+    else:
+        allUIDs.update(booksCollection.find_one({'bookID': bookID})['allUIDs'])
+
+    unscrapableUIDs = set()
+
+    for userID in allUIDs:
+        if ratingsCollection.find({"userID": userID}).count() == 0:
+            # don't have this user's ratings, scrape them
+            ratingDict = getReviews(sleepTime, userID)
+            if ratingDict is not None:
+                ratingsToMongo(ratingsCollection, userID, ratingDict)
+                booksToMongo(booksCollection, userID, ratingDict)
+            else:
+                unscrapableUIDs.add(userID)
+            if (ratingsCollection.find().count() % 10) == 0:
+                print "%d users scraped of (at most) %d." % (ratingsCollection.find().count(), nRatings)
+
+    allUIDs -= unscrapableUIDs
+
+    booksCollection.update_one(
+        {"bookID": bookID},
+        {"$set": {"allUIDs": list(allUIDs)}},
+        upsert=True)
+
+
+
+
 # In[6]:
 
 if __name__ == '__main__':
@@ -193,6 +297,6 @@ if __name__ == '__main__':
     books = db['books']
 
     # DEBUG/TESTING ONLY -- deletes everything we have !!
-    reset_colls(friends, ratings, books)
+    # reset_colls(friends, ratings, books)
 
     exploreFromRecentMultigraph(ratings, friends, books, 0.05)

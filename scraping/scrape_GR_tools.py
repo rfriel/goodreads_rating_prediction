@@ -13,8 +13,8 @@ import cProfile
 import pstats
 import pdb
 
-import networkx as nx
-import nxpd as nxpd
+#import networkx as nx
+#import nxpd as nxpd
 
 import numpy as np
 from random import choice
@@ -202,6 +202,20 @@ def friendsToMongo(friendsCollection, userID, friendIDs):
         upsert=True)
     '''
 
+def populateBooks(ratingsCollection, booksCollection, bookIDlist):
+    userRows = ratingsCollection.find()
+    booksNotEntered = []
+    for i, row in enumerate(userRows):
+        rowRatings = row['ratings']
+        ratedBIDs = filter(lambda k: rowRatings[k][0] != 0, rowRatings.keys())
+        userNotEntered = [int(bID) for bID in ratedBIDs if int(bID) not in bookIDlist]
+        if len(userNotEntered) > 0:
+            booksToMongo(books, row['userID'], row['ratings'])
+            print 'Entered %d books from user %d' % (len(userNotEntered), row['userID'])
+        booksNotEntered.extend(userNotEntered)
+        if i % 10 == 0:
+            print '%.3f%% done' % (100 * i/float(ratings.count()))
+    return booksNotEntered
 
 def snowballSample(startID, depth, sleepTime):
     startTime = timeit.default_timer()
@@ -260,3 +274,27 @@ def reset_colls(friendsCollection, ratingsCollection, booksCollection):
     friendsCollection.delete_many({})
     ratingsCollection.delete_many({})
     booksCollection.delete_many({})
+
+def makeRatingMatrix(ratingsCollection, booksCollection):
+    userRows = ratingsCollection.find()
+    userRatingMat = np.full((ratingsCollection.count(), booksCollection.count()),float('nan'))
+    userIDlist = []
+    bookIDlist = []
+
+    for record in booksCollection.find(projection={'bookID': 1, '_id':0}):
+        bookIDlist.append(int(record['bookID']))
+
+    bookIDdict = {}
+    for i, bookID in enumerate(bookIDlist):
+        bookIDdict[bookID] = i
+
+    for i, row in enumerate(userRows):
+        userIDlist.append(row['userID'])
+        rowRatings = row['ratings']
+        ratedBIDs = filter(lambda k: rowRatings[k][0] != 0, rowRatings.keys())
+        ratedBindices = [bookIDdict[int(bID)] for bID in ratedBIDs]
+        userRatingMat[i, ratedBindices] = \
+            [rowRatings[bID][0] for bID in ratedBIDs]
+        if i % 100 == 0:
+            print '%.3f%% done' % (100 * i/float(ratingsCollection.count()))
+    return userRatingMat
