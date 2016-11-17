@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup, SoupStrainer
 import time
 import timeit
 
+from datetime import datetime
+
 from pymongo import MongoClient
 
 import requests
@@ -274,6 +276,29 @@ def reset_colls(friendsCollection, ratingsCollection, booksCollection):
     friendsCollection.delete_many({})
     ratingsCollection.delete_many({})
     booksCollection.delete_many({})
+
+def makeRatingDictForGL(ratingsCollection, cutoffDate, upperBound=True):
+    grDateFormat = '%b %d, %Y'
+
+    userRows = ratingsCollection.find()
+    glRatingDict = {'userID': [], 'bookID': [], 'rating': []}
+
+    for row in userRows:
+        ratingsField = row['ratings']
+        ratingsField = {k: v for k, v in ratingsField.items()
+                        if (datetime.strptime(v[2], grDateFormat) < cutoffDate)
+                        == upperBound}
+        #ratingsField = filter(lambda r: datetime.strptime(ratingsField[r][2], grDateFormat) < cutoffDate,
+        #                      ratingsField)
+        ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())
+        ratings = [ratingsField[bID][0] for bID in ratedBIDs]
+        userIDlist = [row['userID'] for bID in ratedBIDs]
+
+        glRatingDict['userID'].extend(userIDlist)
+        glRatingDict['bookID'].extend(ratedBIDs)
+        glRatingDict['rating'].extend(ratings)
+
+    return glRatingDict
 
 def makeRatingMatrix(ratingsCollection, booksCollection):
     userRows = ratingsCollection.find()

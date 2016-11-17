@@ -23,7 +23,11 @@ def userFromRecentReviews():
     return uID
 
 
-# In[3]:
+def bookTitle(bookID):
+    urlBook = 'https://www.goodreads.com/book/show/' + str(bookID)
+    soup = BeautifulSoup(requests.get(urlBook,cookies=cookies()).content, 'lxml')
+
+    return soup.select('.bookTitle')[0].text.strip()
 
 def userFromBook(bookID):
     urlBook = 'https://www.goodreads.com/book/show/' + str(bookID)
