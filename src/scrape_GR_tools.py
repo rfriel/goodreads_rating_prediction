@@ -219,32 +219,34 @@ def populateBooks(ratingsCollection, booksCollection, bookIDlist):
             print '%.3f%% done' % (100 * i/float(ratings.count()))
     return booksNotEntered
 
-def snowballSample(startID, depth, sleepTime):
+def snowballSample(ratingsCollection, friendsCollection, booksCollection, startID, depth, sleepTime):
     startTime = timeit.default_timer()
 
     searchIDs = set([startID])
-
-    client = MongoClient('mongodb://localhost:27017/')
-    db = client['goodreads']
-    friends = db['friends']
-    ratings = db['reviews']
 
     for i in range(0, depth+1):
         print 'Starting level %d...' % i
         nextLevelSearchIDs = searchIDs.copy()
         for id in searchIDs:
             #print 'Scraping user %d...' % id
-            if ratings.find({"userID": id}).count() == 0:
+            if ratingsCollection.find({"userID": id}).count() == 0:
                 # don't have this user's ratings, scrape them
-                pass
-                #ratingDict = getReviews(sleepTime, id)
-                #ratingsToMongo(ratings, id, ratingDict)
 
-            if i < depth:
-                friendIDs = getFriends(sleepTime, id)
-                friendsToMongo(friends, id, friendIDs)
-                # add friends to search list
-                nextLevelSearchIDs.update(friendIDs)
+                ratingDict = getReviews(sleepTime, id)
+                if ratingDict is not None:
+                    ratingsToMongo(ratingsCollection, id, ratingDict)
+                    booksToMongo(booksCollection, id, ratingDict)
+
+            if True:# i < depth:
+                if friendsCollection.find({"userID": id}).count() == 0:
+                    # don't have the pre-step user's friends, scrape them
+                    friendIDs = getFriends(sleepTime, id)
+                    if friendIDs is not None:
+                        friendsToMongo(friendsCollection, id, friendIDs)
+                        nextLevelSearchIDs.update(friendIDs)
+                else:
+                    friendIDs = friendsCollection.find_one({"userID": id})['friends']
+                    nextLevelSearchIDs.update(friendIDs)
         if i < depth:
             searchIDs = nextLevelSearchIDs
 
@@ -277,7 +279,7 @@ def reset_colls(friendsCollection, ratingsCollection, booksCollection):
     ratingsCollection.delete_many({})
     booksCollection.delete_many({})
 
-def makeRatingDictForGL(ratingsCollection, cutoffDate, upperBound=True):
+def makeRatingDictForGL(ratingsCollection, booksToExclude=[], cutoffDate=None, upperBound=True):
     grDateFormat = '%b %d, %Y'
 
     userRows = ratingsCollection.find()
@@ -285,9 +287,12 @@ def makeRatingDictForGL(ratingsCollection, cutoffDate, upperBound=True):
 
     for row in userRows:
         ratingsField = row['ratings']
-        ratingsField = {k: v for k, v in ratingsField.items()
+        if cutoffDate is not None:
+            ratingsField = {k: v for k, v in ratingsField.items()
                         if (datetime.strptime(v[2], grDateFormat) < cutoffDate)
                         == upperBound}
+        ratingsField = {k: v for k, v in ratingsField.items()
+                        if int(k) not in booksToExclude}
         #ratingsField = filter(lambda r: datetime.strptime(ratingsField[r][2], grDateFormat) < cutoffDate,
         #                      ratingsField)
         ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())

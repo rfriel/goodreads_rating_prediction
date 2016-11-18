@@ -27,7 +27,14 @@ def bookTitle(bookID):
     urlBook = 'https://www.goodreads.com/book/show/' + str(bookID)
     soup = BeautifulSoup(requests.get(urlBook,cookies=cookies()).content, 'lxml')
 
-    return soup.select('.bookTitle')[0].text.strip()
+    title = soup.select('.bookTitle')[0].text.strip()
+
+    try:
+        nRatings = int(soup.find_all(itemprop="ratingCount")[0].get('title'))
+    except IndexError:
+        return None, None
+
+    return title, nRatings
 
 def userFromBook(bookID):
     urlBook = 'https://www.goodreads.com/book/show/' + str(bookID)
@@ -107,7 +114,10 @@ def computeFriendRatingFractions(ratingsCollection, friendsCollection, booksColl
         for bookID in ratingDict.keys():
             randDraw = np.random.rand()
             if randDraw < sampleRate:
-                allRatingsForBook = booksCollection.find_one({'bookID': {'$eq': int(bookID)}})['ratings'] # dict, keys are userIDs
+                try:
+                    allRatingsForBook = booksCollection.find_one({'bookID': {'$eq': int(bookID)}})['ratings'] # dict, keys are userIDs
+                except TypeError:
+                    allRatingsForBook = []
                 if len(allRatingsForBook) > 1:
                     allRatersForBook = set([int(uID) for uID in allRatingsForBook.keys()])
                     userFriendIDs = set(friendsCollection.find_one({'userID': {'$eq': userID}})['friends'])
@@ -120,7 +130,7 @@ def computeFriendRatingFractions(ratingsCollection, friendsCollection, booksColl
             print len(allUserFractions)
             endTime = timeit.default_timer()
             print 'Time: %f s' % (endTime - startTime)
-            print '%d, or %f%%' % (sampleSize, float(sampleSize)/limit)
+            print '%d, or %f%%' % (sampleSize, 100*float(sampleSize)/limit)
             startTime = timeit.default_timer()
         if sampleSize > limit and limit > 0:
             break
@@ -240,25 +250,29 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
         print 'Found zero ratings.'
         return None
 
-    nPages = nRatings/30 + 1
+    nPages = 10#nRatings/50 + 1
     allUIDs = set()
 
-    if booksCollection.find({'bookID': bookID, 'allUIDs': {'$exists': True}}).count() == 0:
+    if True:#booksCollection.find({'bookID': bookID, 'allUIDs': {'$exists': True}}).count() == 0:
         # don't have a list of all users who rated this book, scrape it
-        for page in range(1, nPages+1):
-            print 'Scraping book\'s raters (page %d of %d)...' % (page, nPages)
-            urlBookPage = 'https://www.goodreads.com/book/delayable_book_show/'     + str(bookID) + '?page=' + str(page)
+        sortStrings = ['default', 'oldest', 'newest']
+        for sortIndex in range(2):
+            for page in range(1, nPages+1):
+                print 'Scraping book\'s raters (page %d of %d)...' % (page, nPages)
+                urlBookPage = 'https://www.goodreads.com/book/delayable_book_show/' + str(bookID) + \
+                    '?per_page=50&page=' + str(page) + '&sort=' + sortStrings[sortIndex]
 
-            soup = BeautifulSoup(requests.get(urlBookPage,cookies=cookies()).content, 'lxml')
+                soup = BeautifulSoup(requests.get(urlBookPage,cookies=cookies()).content, 'lxml')
 
-            users = soup.select('.user')
-            hrefs = [users[index].get('href') for index in range(len(users))]
-            uIDs = [int(href[11:href.find('-')]) for href in hrefs]
-            allUIDs.update(uIDs)
-        booksCollection.update_one(
-            {"bookID": bookID},
-            {"$set": {"allUIDs": list(allUIDs)}},
-            upsert=True)
+                users = soup.select('.user')
+                hrefs = [users[index].get('href') for index in range(len(users))]
+                uIDs = [int(href[11:href.find('-')]) for href in hrefs]
+                print len(allUIDs)
+                allUIDs.update(uIDs)
+            booksCollection.update_one(
+                {"bookID": bookID},
+                {"$set": {"allUIDs": list(allUIDs)}},
+                upsert=True)
 
     else:
         allUIDs.update(booksCollection.find_one({'bookID': bookID})['allUIDs'])
@@ -277,6 +291,14 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
             if (ratingsCollection.find().count() % 10) == 0:
                 print "%d users scraped of (at most) %d." % (ratingsCollection.find().count(), nRatings)
 
+        if friendsCollection.find({"userID": userID}).count() == 0:
+            # don't have this user's friends, scrape them
+            friendIDs = getFriends(sleepTime, userID)
+            if friendIDs is not None:
+                friendsToMongo(friendsCollection, userID, friendIDs)
+            if (friendsCollection.find().count() % 10) == 0:
+                print "%d users scraped of (at most) %d." % (friendsCollection.find().count(), nRatings)
+
     allUIDs -= unscrapableUIDs
 
     booksCollection.update_one(
@@ -294,7 +316,7 @@ if __name__ == '__main__':
 
     client = MongoClient('mongodb://localhost:27017/')
 
-    db = client['goodreads_explore_multigraph']
+    db = client['goodreads_explore_from_book_tunnel']
 
     friends = db['friends']
     ratings = db['reviews']
@@ -303,4 +325,7 @@ if __name__ == '__main__':
     # DEBUG/TESTING ONLY -- deletes everything we have !!
     # reset_colls(friends, ratings, books)
 
-    exploreFromRecentMultigraph(ratings, friends, books, 0.05)
+    #exploreFromRecentMultigraph(ratings, friends, books, 0.05)
+
+    focalBookID = 156182 # The Tunnel
+    exploreFromBook(focalBookID, ratings, friends, books, 0.05)
