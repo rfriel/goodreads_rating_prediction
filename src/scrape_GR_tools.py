@@ -81,7 +81,8 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
             else:
                 print 'Server choked on large page, halfing friends per page to %d . . . ' % int(perPage/2.)
                 perPage = int(perPage/2)
-                numPages *= 2
+                if perPage < 30:
+		    return None
                 curPage = 1
                 friendIDs = []
                 time.sleep(sleepTime)
@@ -101,7 +102,6 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
 
 def getReviews(sleepTime, curUserID, atLeastOneRating=False):
     # this really ought to be called "getRatings"
-    # TO DO ASAP: SAVE RATING DATES!!!!
     startTime = timeit.default_timer()
     ratingDict = {}
 

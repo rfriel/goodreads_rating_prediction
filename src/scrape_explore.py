@@ -253,7 +253,7 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
     nPages = 10#nRatings/50 + 1
     allUIDs = set()
 
-    if True:#booksCollection.find({'bookID': bookID, 'allUIDs': {'$exists': True}}).count() == 0:
+    if booksCollection.find({'bookID': bookID, 'allUIDs': {'$exists': True}}).count() == 0:
         # don't have a list of all users who rated this book, scrape it
         sortStrings = ['default', 'oldest', 'newest']
         for sortIndex in range(2):
@@ -280,7 +280,7 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
     unscrapableUIDs = set()
 
     for userID in allUIDs:
-        if ratingsCollection.find({"userID": userID}).count() == 0:
+        if False:#ratingsCollection.find({"userID": userID}).count() == 0:
             # don't have this user's ratings, scrape them
             ratingDict = getReviews(sleepTime, userID)
             if ratingDict is not None:
