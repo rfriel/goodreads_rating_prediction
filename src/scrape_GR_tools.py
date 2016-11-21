@@ -81,7 +81,8 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
             else:
                 print 'Server choked on large page, halfing friends per page to %d . . . ' % int(perPage/2.)
                 perPage = int(perPage/2)
-                numPages *= 2
+                if perPage < 30:
+                    return None
                 curPage = 1
                 friendIDs = []
                 time.sleep(sleepTime)
@@ -328,3 +329,33 @@ def makeRatingMatrix(ratingsCollection, booksCollection):
         if i % 100 == 0:
             print '%.3f%% done' % (100 * i/float(ratingsCollection.count()))
     return userRatingMat
+
+def completeAdjDict(ratingsCollection, booksCollection, adj_dict, sleepTime):
+    for userID in adj_dict:
+        if ratingsCollection.find({"userID": userID}).count() == 0:
+            ratingDict = getReviews(sleepTime, userID)
+            if ratingDict is not None:
+                ratingsToMongo(ratingsCollection, userID, ratingDict)
+                booksToMongo(booksCollection, userID, ratingDict)
+        if ratingsCollection.count() % 10 == 0:
+            print '%d scraped of %d.' % (ratingsCollection.count(), len(adj_dict))
+
+def populateComms(db, sleepTime, comms):
+    ratingsCollection = db['commRatings']
+    friendsCollection = db['commFriends']
+    booksCollection = db['commBooks']
+
+    for i, comm in enumerate(comms):
+
+        for uID in comm:
+            if friendsCollection.find({"userID": uID}).count() == 0:
+                friendIDs = getFriends(sleepTime, uID)
+                if friendIDs is not None:
+                    friendsToMongo(friendsCollection, uID, friendIDs)
+            if ratingsCollection.find({"userID": uID}).count() == 0:
+                ratingDict = getReviews(sleepTime, uID)
+                if ratingDict is not None:
+                    ratingsToMongo(ratingsCollection, uID, ratingDict)
+                    booksToMongo(booksCollection, uID, ratingDict)
+
+            #snowballSample(ratingsCollection, friendsCollection, booksCollection, uID, 1, sleepTime)
