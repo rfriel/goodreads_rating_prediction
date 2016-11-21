@@ -316,7 +316,11 @@ if __name__ == '__main__':
 
     client = MongoClient('mongodb://localhost:27017/')
 
-    db = client['goodreads_explore_from_book_tunnel']
+    with open('focalbook.txt') as f:
+        focalBookID = int(f.next())
+        focalBookCollectionTag = f.next().rstrip()
+
+    db = client['goodreads_explore_from_book_' + focalBookCollectionTag]
 
     friends = db['friends']
     ratings = db['reviews']
@@ -327,5 +331,9 @@ if __name__ == '__main__':
 
     #exploreFromRecentMultigraph(ratings, friends, books, 0.05)
 
-    focalBookID = 156182 # The Tunnel
-    exploreFromBook(focalBookID, ratings, friends, books, 0.05)
+    #adj_dict = {int(k): v for k, v in db['adj_dict'].find_one()['adj_dict'].items()}
+    #completeAdjDict(ratings, books, adj_dict, 0.05)
+
+    populateComms(db, 0.05, db['comms'].find_one()['comms'])
+
+    #exploreFromBook(focalBookID, ratings, friends, books, 0.05)
