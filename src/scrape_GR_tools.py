@@ -341,14 +341,14 @@ def completeAdjDict(ratingsCollection, booksCollection, adj_dict, sleepTime):
             print '%d scraped of %d.' % (ratingsCollection.count(), len(adj_dict))
 
 def populateComms(db, sleepTime, comms):
-    ratingsCollection = db['commRatings']
-    friendsCollection = db['commFriends']
-    booksCollection = db['commBooks']
+    ratingsCollection = db['ratings']#db['commRatings']
+    friendsCollection = db['friends']#db['commFriends']
+    booksCollection = db['books']#db['commBooks']
 
     for i, comm in enumerate(comms):
 
         for uID in comm:
-            if friendsCollection.find({"userID": uID}).count() == 0:
+            if False:#friendsCollection.find({"userID": uID}).count() == 0:
                 friendIDs = getFriends(sleepTime, uID)
                 if friendIDs is not None:
                     friendsToMongo(friendsCollection, uID, friendIDs)

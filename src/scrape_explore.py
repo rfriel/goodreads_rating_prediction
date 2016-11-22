@@ -320,8 +320,9 @@ if __name__ == '__main__':
         focalBookID = int(f.next())
         focalBookCollectionTag = f.next().rstrip()
 
-    db = client['goodreads_explore_from_book_' + focalBookCollectionTag]
-
+    #db = client['goodreads_explore_from_book_' + focalBookCollectionTag]
+    db = client['goodreads_full']
+    
     friends = db['friends']
     ratings = db['reviews']
     books = db['books']
