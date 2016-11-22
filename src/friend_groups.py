@@ -38,7 +38,7 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
 
     # make adjacency dict
     adj_dict = {}
-    for f in friends.find():
+    for f in friendsCollection.find():
         curFlist = set(f['friends'])
         friendsInData = curFlist & set(userIDlist)
         if len(friendsInData) > 0:
@@ -73,7 +73,7 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
     completedCommsOfInterest = []
     for comm in reducedCommsOfInterest:
         commFriendsLevel1 = {f['userID']: f['friends'] \
-                             for f in friends.find({'userID': {'$in': comm}})\
+                             for f in friendsCollection.find({'userID': {'$in': comm}})\
                             }
         graphCommFriendsLevel1 = nx.from_dict_of_lists(commFriendsLevel1)
 
@@ -112,4 +112,4 @@ if __name__ == '__main__':
 
     populateComms(dbFromBook, 0.05, completedCommsOfInterest)
 
-    #transferToFullDb(dbFull, dbFromBook)
+    transferToFullDb(dbFull, dbFromBook)
