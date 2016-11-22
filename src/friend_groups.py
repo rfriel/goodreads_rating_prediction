@@ -107,6 +107,7 @@ if __name__ == '__main__':
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)
 
     # record the communities
+    dbFromBook['comms'].delete_many({}) # make sure we only have one entry in this collection
     dbFromBook['comms'].insert_one({'comms': completedCommsOfInterest, \
                                     'focalBookID': focalBookID})
 
