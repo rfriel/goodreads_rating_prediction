@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)
 
-    # record the
+    # record the communities
     dbFromBook['comms'].insert_one({'comms': completedCommsOfInterest, \
                                     'focalBookID': focalBookID})
 
