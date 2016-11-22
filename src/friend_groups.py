@@ -20,7 +20,7 @@ def transferToFullDb(dbFull, dbFromBook):
             if booksFull.find({'bookID': int(bookID)}).count() == 0:
                 b = booksFromBook.find_one({'bookID': int(bookID)})
                 if b is not None:
-                    booksCollection.insert_one(b)
+                    booksFull.insert_one(b)
         if i % 10 == 0:
             print i
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     friendsFromBook = dbFromBook['friends']
     booksFromBook = dbFromBook['books']
 
-    exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
+    #exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
 
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)
 
