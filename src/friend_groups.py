@@ -20,7 +20,7 @@ def transferToFullDb(dbFull, dbFromBook):
             if booksFull.find({'bookID': int(bookID)}).count() == 0:
                 b = booksFromBook.find_one({'bookID': int(bookID)})
                 if b is not None:
-                    books.insert_one(b)
+                    booksCollection.insert_one(b)
         if i % 10 == 0:
             print i
 
