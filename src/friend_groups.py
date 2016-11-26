@@ -86,7 +86,7 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
         completedCommsOfInterest.append([node for node in graphCommFriendsLevel1.nodes() \
          if nx.clustering(graphCommFriendsLevel1)[node] > 0])
 
-    return communitySizes, commsOfInterest, reducedCommsOfInterest, completedCommsOfInterest
+    return completedCommsOfInterest
 
 
 if __name__ == '__main__':
