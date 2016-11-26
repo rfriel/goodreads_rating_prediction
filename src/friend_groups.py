@@ -106,7 +106,7 @@ if __name__ == '__main__':
     friendsFromBook = dbFromBook['friends']
     booksFromBook = dbFromBook['books']
 
-    #exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
+    exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
 
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)
 
