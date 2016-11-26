@@ -351,7 +351,7 @@ def populateComms(db, sleepTime, comms):
     for i, comm in enumerate(comms):
 
         for uID in comm:
-            if friendsCollection.find({"userID": uID}).count() == 0:
+            if False:#friendsCollection.find({"userID": uID}).count() == 0:
                 friendIDs = getFriends(sleepTime, uID)
                 if friendIDs is not None:
                     friendsToMongo(friendsCollection, uID, friendIDs)
