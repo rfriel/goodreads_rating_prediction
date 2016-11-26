@@ -18,7 +18,6 @@ def transferToFullDb(dbFull, dbFromBook):
 
     for i, uID in enumerate(commUsers):
         r = ratingsFromBook.find_one({'userID': uID})
-        pdb.set_trace()
         if ratingsFull.find({'userID': uID}).count() == 0:
             ratingsFull.insert_one(r)
         for bookID in r['ratings'].keys():
@@ -85,7 +84,7 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
         completedCommsOfInterest.append([node for node in graphCommFriendsLevel1.nodes() \
          if nx.clustering(graphCommFriendsLevel1)[node] > 0])
 
-    return completedCommsOfInterest
+    return communitySizes, commsOfInterest, reducedCommsOfInterest, completedCommsOfInterest
 
 
 if __name__ == '__main__':
