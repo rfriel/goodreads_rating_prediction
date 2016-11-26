@@ -18,16 +18,18 @@ def transferToFullDb(dbFull, dbFromBook):
 
     for i, uID in enumerate(commUsers):
         r = ratingsFromBook.find_one({'userID': uID})
-        if ratingsFull.find({'userID': uID}).count() == 0 and r is not None:
-            ratingsFull.insert_one(r)
-        for bookID in r['ratings'].keys():
-            if booksFull.find({'bookID': int(bookID)}).count() == 0:
-                b = booksFromBook.find_one({'bookID': int(bookID)})
-                if b is not None:
-                    booksFull.insert_one(b)
+        if r is not None:
+            if ratingsFull.find({'userID': uID}).count() == 0:
+                ratingsFull.insert_one(r)
+            for bookID in r['ratings'].keys():
+                if booksFull.find({'bookID': int(bookID)}).count() == 0:
+                    b = booksFromBook.find_one({'bookID': int(bookID)})
+                    if b is not None:
+                        booksFull.insert_one(b)
         f = friendsFromBook.find_one({'userID': uID})
-        if friendsFull.find({'userID': f['userID']}).count() == 0 and f is not None:
-            friendsFull.insert_one(f)
+        if f is not None:
+            if friendsFull.find({'userID': f['userID']}).count() == 0:
+                friendsFull.insert_one(f)
         if i % 10 == 0:
             print i
 
