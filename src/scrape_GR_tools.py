@@ -280,11 +280,11 @@ def reset_colls(friendsCollection, ratingsCollection, booksCollection):
     ratingsCollection.delete_many({})
     booksCollection.delete_many({})
 
-def makeRatingDictForGL(ratingsCollection, booksToExclude=[], cutoffDate=None, upperBound=True):
+def makeRatingDictForGL(ratingsCollection, commDict, booksToExclude=[], usersToExclude=[], cutoffDate=None, upperBound=True):
     grDateFormat = '%b %d, %Y'
 
     userRows = ratingsCollection.find()
-    glRatingDict = {'userID': [], 'bookID': [], 'rating': []}
+    glRatingDict = {'userID': [], 'bookID': [], 'rating': [], 'comm': []}
 
     for row in userRows:
         ratingsField = row['ratings']
@@ -296,13 +296,16 @@ def makeRatingDictForGL(ratingsCollection, booksToExclude=[], cutoffDate=None, u
                         if int(k) not in booksToExclude}
         #ratingsField = filter(lambda r: datetime.strptime(ratingsField[r][2], grDateFormat) < cutoffDate,
         #                      ratingsField)
-        ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())
-        ratings = [ratingsField[bID][0] for bID in ratedBIDs]
-        userIDlist = [row['userID'] for bID in ratedBIDs]
+        if row['userID'] not in usersToExclude:
+            ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())
+            ratings = [ratingsField[bID][0] for bID in ratedBIDs]
+            userIDlist = [row['userID'] for bID in ratedBIDs]
+            commList = [commDict[row['userID']] for bID in ratedBIDs]
 
-        glRatingDict['userID'].extend(userIDlist)
-        glRatingDict['bookID'].extend(ratedBIDs)
-        glRatingDict['rating'].extend(ratings)
+            glRatingDict['userID'].extend(userIDlist)
+            glRatingDict['bookID'].extend(ratedBIDs)
+            glRatingDict['rating'].extend(ratings)
+            glRatingDict['comm'].extend(commList)
 
     return glRatingDict
 
@@ -348,7 +351,7 @@ def populateComms(db, sleepTime, comms):
     for i, comm in enumerate(comms):
 
         for uID in comm:
-            if False:#friendsCollection.find({"userID": uID}).count() == 0:
+            if friendsCollection.find({"userID": uID}).count() == 0:
                 friendIDs = getFriends(sleepTime, uID)
                 if friendIDs is not None:
                     friendsToMongo(friendsCollection, uID, friendIDs)

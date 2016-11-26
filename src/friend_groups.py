@@ -13,20 +13,25 @@ def transferToFullDb(dbFull, dbFromBook):
     friendsFull = dbFull['friends']
     friendsFromBook = dbFromBook['friends']
 
-    for i, r in enumerate(ratingsFromBook.find()):
-        if ratingsFull.find({'userID': r['userID']}).count() == 0:
+    comms = dbFromBook['comms'].find_one()['comms']
+    commUsers = reduce(lambda a,b: a+b, comms)
+
+    for i, uID in enumerate(commUsers):
+        r = ratingsFromBook.find_one({'userID': uID})
+        pdb.set_trace()
+        if ratingsFull.find({'userID': uID}).count() == 0:
             ratingsFull.insert_one(r)
         for bookID in r['ratings'].keys():
             if booksFull.find({'bookID': int(bookID)}).count() == 0:
                 b = booksFromBook.find_one({'bookID': int(bookID)})
                 if b is not None:
                     booksFull.insert_one(b)
+        f = friendsFromBook.find_one({'userID': uID})
+        if friendsFull.find({'userID': f['userID']}).count() == 0:
+            friendsFull.insert_one(f)
         if i % 10 == 0:
             print i
 
-    for f in friendsFromBook.find():
-        if friendsFromBook.find({'userID': f['userID']}).count() == 0:
-            friendsFull.insert_one(f)
 
 
 def findComms(ratingsCollection, friendsCollection, booksCollection):
@@ -102,7 +107,7 @@ if __name__ == '__main__':
     friendsFromBook = dbFromBook['friends']
     booksFromBook = dbFromBook['books']
 
-    exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
+    #exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
 
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)
 
