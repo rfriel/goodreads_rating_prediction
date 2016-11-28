@@ -292,7 +292,7 @@ def makeRatingDictForGL(ratingsCollection, commDict, booksToInclude=None, usersT
             ratingsField = {k: v for k, v in ratingsField.items()
                         if (datetime.strptime(v[2], grDateFormat) < cutoffDate)
                         == upperBound}
-        elif booksToInclude is not None:
+        if booksToInclude is not None:
             ratingsField = {k: v for k, v in ratingsField.items()
                             if int(k) in booksToInclude}
 

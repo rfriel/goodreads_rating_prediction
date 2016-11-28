@@ -52,7 +52,8 @@ def getCommsOfRaters(ratingsCollection, comms):
 
 
 def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRaterComms, \
-                          bookInclusionReviewThreshold, userInclusionReviewThreshold):
+                          bookInclusionReviewThreshold, userInclusionReviewThreshold, \
+                          timeSplit, cutoffDate=None):
     booksToInclude = set()
     usersToInclude = set()
 
@@ -94,10 +95,19 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
     npRatingCounts = (np.array(ratingCountsByBook['Count']))
     booksToInclude = {int(bID) for bID in npBookIDs[npRatingCounts >= bookInclusionReviewThreshold]}
 
-    glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
-    glRatings = gl.SFrame(glRatingDict)
+    if not timeSplit:
+        glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
+        glRatings = gl.SFrame(glRatingDict)
+        return glRatings
+    else:
+        glRatingDictTrain = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude, \
+                                                cutoffDate, True)
+        glRatingDictTest = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude, \
+                                                cutoffDate, False)
 
-    return glRatings
+        glRatingsTrain = gl.SFrame(glRatingDictTrain)
+        glRatingsTest = gl.SFrame(glRatingDictTest)
+        return glRatingsTrain, glRatingsTest
 
 def makeSocialModelInputs(glRatingsTrain):
     glCommMeansTrain = glRatingsTrain.groupby(['comm'], {'meanRatingByComm': gl.aggregate.MEAN('rating')})
@@ -141,8 +151,12 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
     for bID, comm in zip(bookIDs, commIDs):
         if useBookMeans and ((bID, comm) in commBookMeansTrain):
             predictedRatings.append(commBookMeansTrain[(bID, comm)])
-        else:
+        elif comm in commMeansTrain:
             predictedRatings.append(commMeansTrain[comm])
+        else:
+            # if community of input user doesn't appear in the training data at all,
+            # then just use the average rating over all comms (note: compare to 'over all users'?)
+            predictedRatings.append(sum(commMeansTrain.values())/len(commMeansTrain))
     return np.array(predictedRatings)
 
 def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
@@ -155,7 +169,7 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
                                               glRatingsTestWithComm['bookID'],
                                               glRatingsTestWithComm['comm'],
                                               commMeansTrain, factorCommBookMeansTrain,
-                                              useBookMeans
+                                              True
                                                )
     elif socialRec:
         preds += meanWeight*rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
