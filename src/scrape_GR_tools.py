@@ -280,10 +280,10 @@ def reset_colls(friendsCollection, ratingsCollection, booksCollection):
     ratingsCollection.delete_many({})
     booksCollection.delete_many({})
 
-def makeRatingDictForGL(ratingsCollection, commDict, booksToExclude=[], usersToExclude=[], cutoffDate=None, upperBound=True):
+def makeRatingDictForGL(ratingsCollection, commDict, booksToInclude=None, usersToInclude=[], cutoffDate=None, upperBound=True):
     grDateFormat = '%b %d, %Y'
 
-    userRows = ratingsCollection.find()
+    userRows = ratingsCollection.find({'userID': {'$in': list(usersToInclude)}})
     glRatingDict = {'userID': [], 'bookID': [], 'rating': [], 'comm': []}
 
     for row in userRows:
@@ -292,20 +292,21 @@ def makeRatingDictForGL(ratingsCollection, commDict, booksToExclude=[], usersToE
             ratingsField = {k: v for k, v in ratingsField.items()
                         if (datetime.strptime(v[2], grDateFormat) < cutoffDate)
                         == upperBound}
-        ratingsField = {k: v for k, v in ratingsField.items()
-                        if int(k) not in booksToExclude}
+        elif booksToInclude is not None:
+            ratingsField = {k: v for k, v in ratingsField.items()
+                            if int(k) in booksToInclude}
+
         #ratingsField = filter(lambda r: datetime.strptime(ratingsField[r][2], grDateFormat) < cutoffDate,
         #                      ratingsField)
-        if row['userID'] not in usersToExclude:
-            ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())
-            ratings = [ratingsField[bID][0] for bID in ratedBIDs]
-            userIDlist = [row['userID'] for bID in ratedBIDs]
-            commList = [commDict[row['userID']] for bID in ratedBIDs]
+        ratedBIDs = filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())
+        ratings = [ratingsField[bID][0] for bID in ratedBIDs]
+        userIDlist = [row['userID'] for bID in ratedBIDs]
+        commList = [commDict[row['userID']] for bID in ratedBIDs]
 
-            glRatingDict['userID'].extend(userIDlist)
-            glRatingDict['bookID'].extend(ratedBIDs)
-            glRatingDict['rating'].extend(ratings)
-            glRatingDict['comm'].extend(commList)
+        glRatingDict['userID'].extend(userIDlist)
+        glRatingDict['bookID'].extend(ratedBIDs)
+        glRatingDict['rating'].extend(ratings)
+        glRatingDict['comm'].extend(commList)
 
     return glRatingDict
 
