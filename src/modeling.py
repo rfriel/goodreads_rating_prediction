@@ -36,6 +36,7 @@ def collectAllComms(client):
         if not deleteComm1:
             allCommsPruned.append(comm1)
     print 'Began with %d comms, now have %d after pruning.' % (len(allComms), len(allCommsPruned))
+
     return allCommsPruned
 
 def getCommsOfRaters(ratingsCollection, comms):
@@ -98,6 +99,8 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
     if not timeSplit:
         glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
         glRatings = gl.SFrame(glRatingDict)
+
+        #glRatings = removeGlOutliers(glRatings)
         return glRatings
     else:
         glRatingDictTrain = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude, \
@@ -107,7 +110,20 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
 
         glRatingsTrain = gl.SFrame(glRatingDictTrain)
         glRatingsTest = gl.SFrame(glRatingDictTest)
+
+        #glRatingsTrain = removeGlOutliers(glRatingsTrain)
+        #glRatingsTest = removeGlOutliers(glRatingsTest)
         return glRatingsTrain, glRatingsTest
+
+def removeGlOutliers(glRatings):
+    commIndices = np.array(glRatings.groupby(['comm'], gl.aggregate.COUNT('rating')).sort('comm')['comm'])
+    commSizes = np.array(glRatings.groupby(['comm'], gl.aggregate.COUNT('rating')).sort('comm')['Count'])
+
+    commSizesMed = np.median(commSizes)
+    commSizesStd = np.std(commSizes)
+    outlierDict = {commIndex: np.abs(commSize - commSizesMed) < 3*commSizesStd for commIndex, commSize \
+     in zip(commIndices, commSizes)}
+    return outlierDict, glRatings[glRatings['comm'].apply(lambda x: outlierDict[x])]
 
 def makeSocialModelInputs(glRatingsTrain):
     glCommMeansTrain = glRatingsTrain.groupby(['comm'], {'meanRatingByComm': gl.aggregate.MEAN('rating')})
@@ -162,26 +178,30 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
 def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
               factorCommBookMeansTrain, rec_engine, rec_engine_comm, \
               commMeansOverBaseRec, socialRec, useBookMeans, meanWeight):
-    preds = (1-meanWeight)*rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']).to_numpy()
+    predsBase = rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']).to_numpy()
     if commMeansOverBaseRec:
         #
-        preds += meanWeight*predictFromCommMeans(\
+        predsComm = predictFromCommMeans(\
                                               glRatingsTestWithComm['bookID'],
                                               glRatingsTestWithComm['comm'],
                                               commMeansTrain, factorCommBookMeansTrain,
                                               True
                                                )
     elif socialRec:
-        preds += meanWeight*rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
+        predsComm = rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
 
     else:
         # predict community aggregates solely by retrieving relevant aggregates from a lookup table
-        preds += meanWeight*predictFromCommMeans(\
+        predsComm = predictFromCommMeans(\
                                               glRatingsTestWithComm['bookID'],
                                               glRatingsTestWithComm['comm'],
                                               commMeansTrain, commBookMeansTrain,
                                               useBookMeans
                                                )
+    adjWeights = 1#(np.abs(3.8 - predsBase) / np.max(np.abs(3.8 - predsBase)))
+    adjWeights = 1#np.max(adjWeights) - adjWeights
+
+    preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
     predRmse = rmse(preds, glRatingsTestWithComm['rating'].to_numpy())
     return preds, predRmse
 
