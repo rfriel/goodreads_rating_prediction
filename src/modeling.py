@@ -177,6 +177,7 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
 
 def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
               factorCommBookMeansTrain, rec_engine, rec_engine_comm, \
+              numTrainRatings_Test, \
               commMeansOverBaseRec, socialRec, useBookMeans, meanWeight):
     predsBase = rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']).to_numpy()
     if commMeansOverBaseRec:
@@ -198,8 +199,19 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
                                               commMeansTrain, commBookMeansTrain,
                                               useBookMeans
                                                )
-    adjWeights = 1#(np.abs(3.8 - predsBase) / np.max(np.abs(3.8 - predsBase)))
-    adjWeights = 1#np.max(adjWeights) - adjWeights
+    #adjWeights = 1#(np.abs(3.8 - predsBase) / np.max(np.abs(3.8 - predsBase)))
+    #adjWeights = 1#np.max(adjWeights) - adjWeights
+    #adjWeights=(100. - numTrainRatings_Test)/100.
+    #adjWeights[adjWeights<0]=0
+    #adjWeights = adjWeights**(0.25)
+    #adjWeights = (numTrainRatings_Test < 120).astype(float)
+    #adjWeights = 0.5*(numTrainRatings_Test<30) + 0.5*(numTrainRatings_Test < 150)
+    adjXmax = 150.
+    adjX = numTrainRatings_Test
+    adjX[adjX>adjXmax] = adjXmax
+    adjWeights = np.tan(-2.7*(adjX-(adjXmax/2))/adjXmax)
+    adjWeights = adjWeights / (2*max(adjWeights))
+    adjWeights = adjWeights - min(adjWeights)
 
     preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
     predRmse = rmse(preds, glRatingsTestWithComm['rating'].to_numpy())
