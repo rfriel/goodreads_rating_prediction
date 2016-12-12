@@ -2,6 +2,7 @@ from scrape_GR_tools import *
 from scrape_explore import *
 
 import networkx as nx
+import sys
 
 def transferToFullDb(dbFull, dbFromBook):
     ratingsFull = dbFull['ratings']
@@ -94,7 +95,11 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
 
 if __name__ == '__main__':
 
-    client = MongoClient("mongodb://35.163.255.3") #bigCruncher
+    mongoClientName = "mongodb://" + sys.argv[1]
+    # pass the location of your mongo client as a command line argument
+    # in my project I used one of my Amazon EC2 instances and its associated storage as a central location for MongoDB
+
+    client = MongoClient(mongoClientName)
     dbFull = client['goodreads_full']
 
     ratingsFull = dbFull['ratings']
