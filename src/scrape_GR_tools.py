@@ -21,6 +21,8 @@ import pdb
 import numpy as np
 from random import choice
 
+import sys
+
 def cookies():
     valueList = []
 

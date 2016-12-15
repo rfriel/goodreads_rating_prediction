@@ -2,7 +2,6 @@ from scrape_GR_tools import *
 from scrape_explore import *
 
 import networkx as nx
-import sys
 
 def transferToFullDb(dbFull, dbFromBook):
     ratingsFull = dbFull['ratings']
@@ -94,6 +93,7 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
 
 
 if __name__ == '__main__':
+    # setting up mongodb
 
     mongoClientName = "mongodb://" + sys.argv[1]
     # pass the location of your mongo client as a command line argument

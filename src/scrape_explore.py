@@ -4,7 +4,6 @@
 # In[1]:
 
 from scrape_GR_tools import *
-from collections import Counter
 
 # In[2]:
 
@@ -314,7 +313,11 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
 if __name__ == '__main__':
     # setting up mongodb
 
-    client = MongoClient('mongodb://localhost:27017/')
+    mongoClientName = "mongodb://" + sys.argv[1]
+    # pass the location of your mongo client as a command line argument
+    # in my project I used one of my Amazon EC2 instances and its associated storage as a central location for MongoDB
+
+    client = MongoClient(mongoClientName)
 
     with open('focalbook.txt') as f:
         focalBookID = int(f.next())
@@ -322,7 +325,7 @@ if __name__ == '__main__':
 
     #db = client['goodreads_explore_from_book_' + focalBookCollectionTag]
     db = client['goodreads_full']
-    
+
     friends = db['friends']
     ratings = db['reviews']
     books = db['books']
