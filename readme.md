@@ -53,7 +53,7 @@ The best approach I've found has been to choose a single *book*, scrape the user
 
 <img src="https://raw.githubusercontent.com/rfriel/goodreads_rating_prediction/master/images/social_graph_focal_book.png">
 
-There is one very large connected component (center, grey).  Ignoring it for now, note that there are a number of connected components that contain some users who are all friends with one another.  Intuitively, we'd expect each of these [cliques](https://en.wikipedia.org/wiki/Clique_(graph_theory) to constitute part, if not all, of distinct social group (in the informal sense of the phrase).
+There is one very large connected component (center, grey).  Ignoring it for now, note that there are a number of connected components that contain some users who are all friends with one another.  Intuitively, we'd expect each of these <a href="https://en.wikipedia.org/wiki/Clique_(graph_theory)">cliques</a> to constitute part, if not all, of distinct social group (in the informal sense of the phrase).
 
 Since these users have at least one book in common (in this case, Of Mice and Men), they are relatively likely to have other ratings in common as well.  (Choosing a more "niche" book will strengthen this similarity, at the cost of capturing a less diverse range of users.)
 
