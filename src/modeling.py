@@ -58,16 +58,19 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
     booksToInclude = set()
     usersToInclude = set()
 
+
+    for b in booksCollection.find({'bookID': {'$in': booksToRaterComms.keys()}}):
+        raterUIDs = set([int(uID) for uID in b['ratings'].keys()])
+        if len(booksToRaterComms[b['bookID']]) >= 1 and len(raterUIDs) >= bookInclusionReviewThreshold:
+            booksToInclude.add(b['bookID'])
+
     for r in ratingsCollection.find({'userID': {'$in': [uID for comm in comms for uID in comm]}}):
-        if len(r['ratings']) >= userInclusionReviewThreshold:
+        ratingsField = r['ratings']
+        ratedBIDs = {int(bID) for bID in filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())}
+        if len(ratedBIDs & booksToInclude) >= userInclusionReviewThreshold:
             usersToInclude.add(r['userID'])
 
     '''
-    for b in booksCollection.find({'bookID': {'$in': booksToRaterComms.keys()}}):
-        raterUIDs = set([int(uID) for uID in b['ratings'].keys()])
-        if len(booksToRaterComms[b['bookID']]) >= 1 and len(raterUIDs & usersToInclude) >= bookInclusionReviewThreshold:
-            booksToInclude.add(b['bookID'])
-
     for r in ratingsCollection.find({'userID': {'$in': list(usersToInclude)}}):
         ratedBIDs = set([int(bID) for bID in r['ratings'].keys()])
         if len(ratedBIDs & booksToInclude) < userInclusionReviewThreshold:
@@ -88,7 +91,7 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
 
     commDict = {uID: i for i, comm in enumerate(comms) for uID in comm}
 
-    glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, None, usersToInclude)
+    glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
     glRatings = gl.SFrame(glRatingDict)
 
     ratingCountsByBook = glRatings.groupby(['bookID'], gl.aggregate.COUNT('rating'))
@@ -175,11 +178,22 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
             predictedRatings.append(sum(commMeansTrain.values())/len(commMeansTrain))
     return np.array(predictedRatings)
 
+class surprisePredWrapper():
+    def __init__(self, surpriseModel):
+        self.surpriseModel = surpriseModel
+    def predict(self, glRatings):
+        # line below gives a value of 0 to the predict method for the true rating
+        # because we don't need the true ratings here to be correct, as they
+        # will not be returned
+        preds=[self.surpriseModel.predict(str(row['userID']),str(row['bookID']),0).est for row in glRatings]
+        return preds
+
+
 def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
               factorCommBookMeansTrain, rec_engine, rec_engine_comm, \
               numTrainRatings_Test, \
               commMeansOverBaseRec, socialRec, useBookMeans, meanWeight):
-    predsBase = rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']).to_numpy()
+    predsBase = np.array(rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']))
     if commMeansOverBaseRec:
         #
         predsComm = predictFromCommMeans(\
@@ -189,8 +203,10 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
                                               True
                                                )
     elif socialRec:
-        predsComm = rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
-
+        #predsComm = rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
+        # the line below is JUST for testing combinations of ALS-factor and linear graphlab recommenders
+        # the line above should be used for actual community recommenders
+        predsComm = np.array(rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'userID']))
     else:
         # predict community aggregates solely by retrieving relevant aggregates from a lookup table
         predsComm = predictFromCommMeans(\
@@ -213,7 +229,8 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
     adjWeights = adjWeights / (2*max(adjWeights))
     adjWeights = adjWeights - min(adjWeights)
 
-    preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
+    preds = (1-meanWeight)*predsBase + meanWeight*predsComm
+    #preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
     predRmse = rmse(preds, glRatingsTestWithComm['rating'].to_numpy())
     return preds, predRmse
 
