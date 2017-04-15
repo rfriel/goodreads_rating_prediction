@@ -176,6 +176,7 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
             # if community of input user doesn't appear in the training data at all,
             # then just use the average rating over all comms (note: compare to 'over all users'?)
             predictedRatings.append(sum(commMeansTrain.values())/len(commMeansTrain))
+            #predictedRatings.append(-1)
     return np.array(predictedRatings)
 
 class surprisePredWrapper():
@@ -203,10 +204,7 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
                                               True
                                                )
     elif socialRec:
-        #predsComm = rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
-        # the line below is JUST for testing combinations of ALS-factor and linear graphlab recommenders
-        # the line above should be used for actual community recommenders
-        predsComm = np.array(rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'userID']))
+        predsComm = np.array(rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm'].rename({'comm':'userID'})))
     else:
         # predict community aggregates solely by retrieving relevant aggregates from a lookup table
         predsComm = predictFromCommMeans(\
@@ -222,15 +220,17 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
     #adjWeights = adjWeights**(0.25)
     #adjWeights = (numTrainRatings_Test < 120).astype(float)
     #adjWeights = 0.5*(numTrainRatings_Test<30) + 0.5*(numTrainRatings_Test < 150)
-    adjXmax = 150.
-    adjX = numTrainRatings_Test
+
+    adjXmax = 100.
+    adjX = numTrainRatings_Test.copy()
     adjX[adjX>adjXmax] = adjXmax
-    adjWeights = np.tan(-2.7*(adjX-(adjXmax/2))/adjXmax)
-    adjWeights = adjWeights / (2*max(adjWeights))
+    adjWeights = (adjX-(adjXmax/2))/adjXmax
+    adjWeights = adjWeights / (max(adjWeights)-min(adjWeights))
     adjWeights = adjWeights - min(adjWeights)
 
-    preds = (1-meanWeight)*predsBase + meanWeight*predsComm
-    #preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
+    predsComm[predsComm<0] = predsBase[predsComm<0]
+    #preds = (1-meanWeight)*predsBase + meanWeight*predsComm
+    preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
     predRmse = rmse(preds, glRatingsTestWithComm['rating'].to_numpy())
     return preds, predRmse
 
