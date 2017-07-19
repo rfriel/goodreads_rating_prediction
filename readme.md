@@ -1,9 +1,4 @@
 # Goodreads rating prediction using social network information
-Robert Friel
-
-Capstone Project, Galvanize Data Science Intensive, Fall 2016
-
-***
 
 Goodreads is a social networking site centering around rating and reviewing books.  Ratings are given on a discrete scale from 1 to 5 stars.  A traditional recommender system would predict unseen ratings using rating data alone.  Can these predictions be improved by leveraging information about a user's social connections?
 
