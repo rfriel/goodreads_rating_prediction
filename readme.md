@@ -10,6 +10,8 @@ The second section, ["Code,"](#code) describes the  code contained in this repo 
 
 The third section, ["Future Work,"](#future-work) lists current issues with the code I intend to fix, and features I would like to add.
 
+Note (7/18/17): I've done some more work on this project since this was written, which is currently in the "post-galv" branch and isn't very readable yet.  Specifically, I've switched from GraphLab's recommenders to Nicolas Hug's [Surprise](http://surpriselib.com/) library, and gotten both better performance out of the traditional recommender and a larger performance boost from social information.  I'd like to write this up here when I get time.
+
 ## Project Description
 
 ### Objectives
