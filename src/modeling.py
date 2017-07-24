@@ -5,10 +5,10 @@ import graphlab as gl
 
 from collections import defaultdict
 
-def collectAllComms(client):
+def collectAllComms(client, db_exclude={}, removeOutliers=True):
     allComms = []
     for name in client.database_names():
-        if name[:28] == 'goodreads_explore_from_book_':
+        if name[:28] == 'goodreads_explore_from_book_' and name[28:] not in db_exclude:
             print "Checking database '%s'" % name
             db = client[name]
             if db['comms'].count() != 1:
@@ -35,6 +35,15 @@ def collectAllComms(client):
                 deleteComm1 = True
         if not deleteComm1:
             allCommsPruned.append(comm1)
+    if removeOutliers:
+        len_with_outliers = len(allCommsPruned)
+        commSizes = [len(c) for c in allCommsPruned]
+
+        commSizesMed = np.median(commSizes)
+        commSizesStd = np.std(commSizes)
+        allCommsPruned = [comm for comm, commSize in zip(allCommsPruned, commSizes)
+                          if np.abs(commSize - commSizesMed) < 3*commSizesStd]
+        print 'Removed %d outlier comms' % (len_with_outliers - len(allCommsPruned))
     print 'Began with %d comms, now have %d after pruning.' % (len(allComms), len(allCommsPruned))
 
     return allCommsPruned
@@ -94,10 +103,10 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
     glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
     glRatings = gl.SFrame(glRatingDict)
 
-    ratingCountsByBook = glRatings.groupby(['bookID'], gl.aggregate.COUNT('rating'))
-    npBookIDs = np.array(ratingCountsByBook['bookID'])
-    npRatingCounts = (np.array(ratingCountsByBook['Count']))
-    booksToInclude = {int(bID) for bID in npBookIDs[npRatingCounts >= bookInclusionReviewThreshold]}
+    # ratingCountsByBook = glRatings.groupby(['bookID'], gl.aggregate.COUNT('rating'))
+    # npBookIDs = np.array(ratingCountsByBook['bookID'])
+    # npRatingCounts = (np.array(ratingCountsByBook['Count']))
+    # booksToInclude = {int(bID) for bID in npBookIDs[npRatingCounts >= bookInclusionReviewThreshold]}
 
     if not timeSplit:
         glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
