@@ -55,6 +55,7 @@ def getFriends(sleepTime, curUserID, friendCountOnly=False):
     while not request_success:
         try:
             soup = BeautifulSoup(requests.get(url,cookies=cookies()).content, 'lxml')
+            request_success = True
         except requests.exceptions.ConnectionError:
             print 'ConnectionError, waiting %d seconds...' % wait_seconds
             time.sleep(wait_seconds)
