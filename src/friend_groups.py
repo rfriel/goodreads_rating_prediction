@@ -94,7 +94,6 @@ def findComms(ratingsCollection, friendsCollection, booksCollection):
 
 if __name__ == '__main__':
     # setting up mongodb
-
     mongoClientName = "mongodb://" + sys.argv[1]
     # pass the location of your mongo client as a command line argument
     # in my project I used one of my Amazon EC2 instances and its associated storage as a central location for MongoDB
@@ -116,6 +115,7 @@ if __name__ == '__main__':
     friendsFromBook = dbFromBook['friends']
     booksFromBook = dbFromBook['books']
 
+    import pdb; pdb.set_trace()
     exploreFromBook(focalBookID, ratingsFromBook, friendsFromBook, booksFromBook, 0.05)
 
     completedCommsOfInterest = findComms(ratingsFromBook, friendsFromBook, booksFromBook)

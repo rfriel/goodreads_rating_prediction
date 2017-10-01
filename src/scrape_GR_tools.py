@@ -39,17 +39,23 @@ def cookies():
         for line in f:
             valueList.append(line.strip())
     return {'u': valueList[0], 'p': valueList[1]}
-    '''
-    return {'u': 'VX7fS6J-Gz1PR40f-p17g7wh9VjMjk9QZGMry2aJVjBdyRI0', \
-          'p': 'K40nHvKlIuz-1knEFEfM755lu5S2kCE0YpLNQsjr6-SdEfm1'}
-    '''
 
 def getFriends(sleepTime, curUserID, friendCountOnly=False):
     startTime = timeit.default_timer()
     url = 'https://www.goodreads.com/friend/user/' + str(curUserID)
-    #browser.get(url)
-    soup = BeautifulSoup(requests.get(url,cookies=cookies()).content, 'lxml')
-    #friendCount = browser.find_element_by_class_name('smallText').text
+
+    # this block deals with 'connection reset by peer' responses, which
+    # happen sometimes with this particular request
+    request_success = False
+    wait_seconds = 5
+    while not request_success:
+        try:
+            soup = BeautifulSoup(requests.get(url,cookies=cookies()).content, 'lxml')
+            request_success = True
+        except requests.exceptions.ConnectionError:
+            print 'ConnectionError, waiting %d seconds...' % wait_seconds
+            time.sleep(wait_seconds)
+            wait_seconds *= 2
     try:
         friendCount = soup.select_one('.smallText').get_text()
     except AttributeError:

@@ -5,10 +5,10 @@ import graphlab as gl
 
 from collections import defaultdict
 
-def collectAllComms(client):
+def collectAllComms(client, db_exclude={}, removeOutliers=True):
     allComms = []
     for name in client.database_names():
-        if name[:28] == 'goodreads_explore_from_book_':
+        if name[:28] == 'goodreads_explore_from_book_' and name[28:] not in db_exclude:
             print "Checking database '%s'" % name
             db = client[name]
             if db['comms'].count() != 1:
@@ -35,6 +35,15 @@ def collectAllComms(client):
                 deleteComm1 = True
         if not deleteComm1:
             allCommsPruned.append(comm1)
+    if removeOutliers:
+        len_with_outliers = len(allCommsPruned)
+        commSizes = [len(c) for c in allCommsPruned]
+
+        commSizesMed = np.median(commSizes)
+        commSizesStd = np.std(commSizes)
+        allCommsPruned = [comm for comm, commSize in zip(allCommsPruned, commSizes)
+                          if np.abs(commSize - commSizesMed) < 3*commSizesStd]
+        print 'Removed %d outlier comms' % (len_with_outliers - len(allCommsPruned))
     print 'Began with %d comms, now have %d after pruning.' % (len(allComms), len(allCommsPruned))
 
     return allCommsPruned
@@ -58,16 +67,19 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
     booksToInclude = set()
     usersToInclude = set()
 
+
+    for b in booksCollection.find({'bookID': {'$in': booksToRaterComms.keys()}}):
+        raterUIDs = set([int(uID) for uID in b['ratings'].keys()])
+        if len(booksToRaterComms[b['bookID']]) >= 1 and len(raterUIDs) >= bookInclusionReviewThreshold:
+            booksToInclude.add(b['bookID'])
+
     for r in ratingsCollection.find({'userID': {'$in': [uID for comm in comms for uID in comm]}}):
-        if len(r['ratings']) >= userInclusionReviewThreshold:
+        ratingsField = r['ratings']
+        ratedBIDs = {int(bID) for bID in filter(lambda k: ratingsField[k][0] != 0, ratingsField.keys())}
+        if len(ratedBIDs & booksToInclude) >= userInclusionReviewThreshold:
             usersToInclude.add(r['userID'])
 
     '''
-    for b in booksCollection.find({'bookID': {'$in': booksToRaterComms.keys()}}):
-        raterUIDs = set([int(uID) for uID in b['ratings'].keys()])
-        if len(booksToRaterComms[b['bookID']]) >= 1 and len(raterUIDs & usersToInclude) >= bookInclusionReviewThreshold:
-            booksToInclude.add(b['bookID'])
-
     for r in ratingsCollection.find({'userID': {'$in': list(usersToInclude)}}):
         ratedBIDs = set([int(bID) for bID in r['ratings'].keys()])
         if len(ratedBIDs & booksToInclude) < userInclusionReviewThreshold:
@@ -88,13 +100,13 @@ def makeRecommenderInputs(ratingsCollection, booksCollection, comms, booksToRate
 
     commDict = {uID: i for i, comm in enumerate(comms) for uID in comm}
 
-    glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, None, usersToInclude)
+    glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
     glRatings = gl.SFrame(glRatingDict)
 
-    ratingCountsByBook = glRatings.groupby(['bookID'], gl.aggregate.COUNT('rating'))
-    npBookIDs = np.array(ratingCountsByBook['bookID'])
-    npRatingCounts = (np.array(ratingCountsByBook['Count']))
-    booksToInclude = {int(bID) for bID in npBookIDs[npRatingCounts >= bookInclusionReviewThreshold]}
+    # ratingCountsByBook = glRatings.groupby(['bookID'], gl.aggregate.COUNT('rating'))
+    # npBookIDs = np.array(ratingCountsByBook['bookID'])
+    # npRatingCounts = (np.array(ratingCountsByBook['Count']))
+    # booksToInclude = {int(bID) for bID in npBookIDs[npRatingCounts >= bookInclusionReviewThreshold]}
 
     if not timeSplit:
         glRatingDict = makeRatingDictForGL(ratingsCollection, commDict, booksToInclude, usersToInclude)
@@ -173,13 +185,25 @@ def predictFromCommMeans(bookIDs, commIDs, commMeansTrain, commBookMeansTrain, u
             # if community of input user doesn't appear in the training data at all,
             # then just use the average rating over all comms (note: compare to 'over all users'?)
             predictedRatings.append(sum(commMeansTrain.values())/len(commMeansTrain))
+            #predictedRatings.append(-1)
     return np.array(predictedRatings)
+
+class surprisePredWrapper():
+    def __init__(self, surpriseModel):
+        self.surpriseModel = surpriseModel
+    def predict(self, glRatings):
+        # line below gives a value of 0 to the predict method for the true rating
+        # because we don't need the true ratings here to be correct, as they
+        # will not be returned
+        preds=[self.surpriseModel.predict(str(row['userID']),str(row['bookID']),0).est for row in glRatings]
+        return preds
+
 
 def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
               factorCommBookMeansTrain, rec_engine, rec_engine_comm, \
               numTrainRatings_Test, \
               commMeansOverBaseRec, socialRec, useBookMeans, meanWeight):
-    predsBase = rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']).to_numpy()
+    predsBase = np.array(rec_engine.predict(glRatingsTestWithComm['bookID', 'userID']))
     if commMeansOverBaseRec:
         #
         predsComm = predictFromCommMeans(\
@@ -189,8 +213,7 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
                                               True
                                                )
     elif socialRec:
-        predsComm = rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm']).to_numpy()
-
+        predsComm = np.array(rec_engine_comm.predict(glRatingsTestWithComm['bookID', 'comm'].rename({'comm':'userID'})))
     else:
         # predict community aggregates solely by retrieving relevant aggregates from a lookup table
         predsComm = predictFromCommMeans(\
@@ -206,13 +229,16 @@ def mixedPred(glRatingsTestWithComm, commMeansTrain, commBookMeansTrain,\
     #adjWeights = adjWeights**(0.25)
     #adjWeights = (numTrainRatings_Test < 120).astype(float)
     #adjWeights = 0.5*(numTrainRatings_Test<30) + 0.5*(numTrainRatings_Test < 150)
-    adjXmax = 150.
-    adjX = numTrainRatings_Test
+
+    adjXmax = 100.
+    adjX = numTrainRatings_Test.copy()
     adjX[adjX>adjXmax] = adjXmax
-    adjWeights = np.tan(-2.7*(adjX-(adjXmax/2))/adjXmax)
-    adjWeights = adjWeights / (2*max(adjWeights))
+    adjWeights = (adjX-(adjXmax/2))/adjXmax
+    adjWeights = adjWeights / (max(adjWeights)-min(adjWeights))
     adjWeights = adjWeights - min(adjWeights)
 
+    predsComm[predsComm<0] = predsBase[predsComm<0]
+    #preds = (1-meanWeight)*predsBase + meanWeight*predsComm
     preds = (1-adjWeights*meanWeight)*predsBase + meanWeight*adjWeights*predsComm
     predRmse = rmse(preds, glRatingsTestWithComm['rating'].to_numpy())
     return preds, predRmse

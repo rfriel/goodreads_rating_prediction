@@ -288,7 +288,7 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
             else:
                 unscrapableUIDs.add(userID)
             if (ratingsCollection.find().count() % 10) == 0:
-                print "%d users scraped of (at most) %d." % (ratingsCollection.find().count(), nRatings)
+                print "%d users scraped of (at most) %d." % (ratingsCollection.find().count(), len(allUIDs))
 
         if friendsCollection.find({"userID": userID}).count() == 0:
             # don't have this user's friends, scrape them
@@ -296,7 +296,7 @@ def exploreFromBook(bookID, ratingsCollection, friendsCollection, booksCollectio
             if friendIDs is not None:
                 friendsToMongo(friendsCollection, userID, friendIDs)
             if (friendsCollection.find().count() % 10) == 0:
-                print "%d users scraped of (at most) %d." % (friendsCollection.find().count(), nRatings)
+                print "%d users scraped of (at most) %d." % (friendsCollection.find().count(), len(allUIDs))
 
     allUIDs -= unscrapableUIDs
 
