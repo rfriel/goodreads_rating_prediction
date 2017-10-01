@@ -39,10 +39,6 @@ def cookies():
         for line in f:
             valueList.append(line.strip())
     return {'u': valueList[0], 'p': valueList[1]}
-    '''
-    return {'u': 'VX7fS6J-Gz1PR40f-p17g7wh9VjMjk9QZGMry2aJVjBdyRI0', \
-          'p': 'K40nHvKlIuz-1knEFEfM755lu5S2kCE0YpLNQsjr6-SdEfm1'}
-    '''
 
 def getFriends(sleepTime, curUserID, friendCountOnly=False):
     startTime = timeit.default_timer()
